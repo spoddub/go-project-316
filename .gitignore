@@ -40,3 +40,4 @@ storage/debug/*.jsonl
 
 # JMX Exporter binary
 monitoring/jmx-exporter/*.jar
+bin/
