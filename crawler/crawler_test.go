@@ -23,17 +23,21 @@ func newTestClient(fn roundTripFunc) *http.Client {
 	}
 }
 
+func newResponse(statusCode int, body string) *http.Response {
+	return &http.Response{
+		StatusCode: statusCode,
+		Body:       io.NopCloser(strings.NewReader(body)),
+		Header:     make(http.Header),
+	}
+}
+
 func TestAnalyzeSuccess(t *testing.T) {
 	client := newTestClient(func(req *http.Request) (*http.Response, error) {
 		if req.URL.String() != "https://example.com" {
 			t.Fatalf("expected URL https://example.com, got %s", req.URL.String())
 		}
 
-		return &http.Response{
-			StatusCode: http.StatusOK,
-			Body:       io.NopCloser(strings.NewReader("OK")),
-			Header:     make(http.Header),
-		}, nil
+		return newResponse(http.StatusOK, "OK"), nil
 	})
 
 	report, err := crawler.Analyze("https://example.com", crawler.Options{
@@ -68,12 +72,8 @@ func TestAnalyzeSuccess(t *testing.T) {
 }
 
 func TestAnalyzeNotFoundStatus(t *testing.T) {
-	client := newTestClient(func(req *http.Request) (*http.Response, error) {
-		return &http.Response{
-			StatusCode: http.StatusNotFound,
-			Body:       io.NopCloser(strings.NewReader("Not Found")),
-			Header:     make(http.Header),
-		}, nil
+	client := newTestClient(func(_ *http.Request) (*http.Response, error) {
+		return newResponse(http.StatusNotFound, "Not Found"), nil
 	})
 
 	report, err := crawler.Analyze("https://example.com/missing", crawler.Options{
@@ -96,12 +96,8 @@ func TestAnalyzeNotFoundStatus(t *testing.T) {
 }
 
 func TestAnalyzeServerErrorStatus(t *testing.T) {
-	client := newTestClient(func(req *http.Request) (*http.Response, error) {
-		return &http.Response{
-			StatusCode: http.StatusInternalServerError,
-			Body:       io.NopCloser(strings.NewReader("Internal Server Error")),
-			Header:     make(http.Header),
-		}, nil
+	client := newTestClient(func(_ *http.Request) (*http.Response, error) {
+		return newResponse(http.StatusInternalServerError, "Internal Server Error"), nil
 	})
 
 	report, err := crawler.Analyze("https://example.com/error", crawler.Options{
@@ -124,7 +120,7 @@ func TestAnalyzeServerErrorStatus(t *testing.T) {
 }
 
 func TestAnalyzeNetworkError(t *testing.T) {
-	client := newTestClient(func(req *http.Request) (*http.Response, error) {
+	client := newTestClient(func(_ *http.Request) (*http.Response, error) {
 		return nil, errors.New("network is unreachable")
 	})
 
