@@ -2,6 +2,7 @@ package crawler
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 )
@@ -51,10 +52,18 @@ func Analyze(rootURL string, options Options) (*Report, error) {
 	}
 
 	resp, err := client.Do(req)
+	if err != nil {
+		report.Pages[0].Error = err.Error()
+		return report, nil
+	}
 
 	defer resp.Body.Close()
 
 	report.Pages[0].HTTPStatus = resp.StatusCode
+
+	if resp.StatusCode >= 400 {
+		report.Pages[0].Error = fmt.Sprintf("unexpected status code: %d", resp.StatusCode)
+	}
 
 	return report, nil
 }
