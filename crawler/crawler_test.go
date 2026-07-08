@@ -232,3 +232,47 @@ func TestAnalyzeBrokenLinks(t *testing.T) {
 		t.Fatalf("expected empty error, got %s", brokenLink.Error)
 	}
 }
+
+func TestAnalyzeIgnoresUnsupportedLinks(t *testing.T) {
+	html := `
+		<html>
+			<body>
+				<a href="">Empty</a>
+				<a href="#top">Anchor</a>
+				<a href="mailto:test@example.com">Email</a>
+				<a href="tel:+123456789">Phone</a>
+				<a href="javascript:void(0)">JS</a>
+			</body>
+		</html>
+	`
+
+	requestsCount := 0
+
+	client := newTestClient(func(req *http.Request) (*http.Response, error) {
+		requestsCount++
+
+		if req.URL.String() != "http://simple.test" {
+			return nil, errors.New("unexpected request: " + req.URL.String())
+		}
+
+		return newResponse(http.StatusOK, html), nil
+	})
+
+	report, err := crawler.Analyze("http://simple.test", crawler.Options{
+		Client: client,
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	page := report.Pages[0]
+
+	if len(page.BrokenLinks) != 0 {
+		t.Fatalf("expected 0 broken links, got %d", len(page.BrokenLinks))
+	}
+
+	if requestsCount != 1 {
+		t.Fatalf("expected only 1 request to root page, got %d", requestsCount)
+	}
+}
