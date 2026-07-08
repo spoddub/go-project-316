@@ -171,3 +171,64 @@ func TestAnalyzeTimeout(t *testing.T) {
 		t.Fatal("expected timeout/context error message")
 	}
 }
+
+func TestAnalyzeBrokenLinks(t *testing.T) {
+	html := `
+		<html>
+			<head>
+				<link href="/ok.css">
+				<link href="/missing.css">
+			</head>
+			<body>
+				<a href="/about.html">About</a>
+			</body>
+		</html>
+	`
+
+	client := newTestClient(func(req *http.Request) (*http.Response, error) {
+		switch req.URL.String() {
+		case "http://simple.test":
+			return newResponse(http.StatusOK, html), nil
+		case "http://simple.test/ok.css":
+			return newResponse(http.StatusOK, "OK"), nil
+		case "http://simple.test/missing.css":
+			return newResponse(http.StatusNotFound, "Not Found"), nil
+		case "http://simple.test/about.html":
+			return newResponse(http.StatusOK, "OK"), nil
+		default:
+			return nil, errors.New("unexpected request: " + req.URL.String())
+		}
+	})
+
+	report, err := crawler.Analyze("http://simple.test", crawler.Options{
+		Client: client,
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(report.Pages) != 1 {
+		t.Fatalf("expected 1 page, got %d", len(report.Pages))
+	}
+
+	page := report.Pages[0]
+
+	if len(page.BrokenLinks) != 1 {
+		t.Fatalf("expected 1 broken link, got %d", len(page.BrokenLinks))
+	}
+
+	brokenLink := page.BrokenLinks[0]
+
+	if brokenLink.URL != "http://simple.test/missing.css" {
+		t.Fatalf("expected broken link URL http://simple.test/missing.css, got %s", brokenLink.URL)
+	}
+
+	if brokenLink.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected status code 404, got %d", brokenLink.StatusCode)
+	}
+
+	if brokenLink.Error != "" {
+		t.Fatalf("expected empty error, got %s", brokenLink.Error)
+	}
+}
